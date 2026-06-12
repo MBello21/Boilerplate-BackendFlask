@@ -1,25 +1,47 @@
 from flask import Flask, request, jsonify, url_for, Blueprint, current_app
 from flask_cors import CORS
 from sqlalchemy import select, func
-from api.models import db, User
+from api.models import db, Meteorological, Recommendation
 
 api = Blueprint('api', __name__)
 
 CORS(api)
 
-@api.route('/users', methods=['GET'])
-def get_users():
-    users = User.query.all()
-    response = [user.serialize() for user in users]
-    return jsonify(response), 200
-    
-@api.route('/user', methods=['POST'])
-def create_user():
+
+@api.route('/temperature', methods=['GET'])
+def get_temperature():
+    result = Meteorological.query.filter_by(freak='temperatura').all()
+    return jsonify([f.serialize() for f in result]), 200
+
+
+@api.route('/temperature', methods=['POST'])
+def post_temperature():
     data = request.get_json()
-    new_user = User (firstname = data.get("firstname"))
-    db.session.add(new_user)
+    
+
+    if not data:
+        return jsonify({'error': 'All fields are required'}), 401
+
+    recommendations = data.get("recomendation_list")
+    new_meteorological = Meteorological(
+        freak=data.get("freak", "temperatura"),
+        cat=data.get("cat"),
+        title=data.get("title"),
+        recommendation=data.get("recommendation"),
+    )
+    
+    db.session.add(new_meteorological)
     db.session.commit()
     
-    return jsonify({"msg": "Usuario creado"}), 201
-    
-    
+    for recommendation in recommendations:
+        new_recommendation = Recommendation(
+            freak_id= new_meteorological.id,
+            recommendation= recommendation
+        )
+        db.session.add(new_recommendation)
+        db.session.commit()
+
+    return jsonify({
+        "msg": "Created successfully",
+        "recommendation": new_meteorological.serialize()
+    }), 201
